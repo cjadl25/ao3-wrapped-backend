@@ -1,13 +1,26 @@
 # scraper_live.py
-from playwright.sync_api import sync_playwright
+from playwright.async_api import async_playwright
 from bs4 import BeautifulSoup
 from collections import Counter
-import time, re, os
+import re
+import asyncio
 
 def extract_number(text):
+    """Extract integer from text, return 0 if not found"""
     return int(re.sub(r"[^\d]", "", text)) if text else 0
 
-def scrape_ao3_with_progress(username, password, progress_callback=None):
+async def scrape_ao3_with_progress(username, password, progress_callback=None):
+    """
+    Asynchronous AO3 scraping with progress updates.
+    
+    Args:
+        username (str): AO3 username
+        password (str): AO3 password
+        progress_callback (func): function to call with progress percentage (0-100)
+    
+    Returns:
+        dict: Stats summary
+    """
     fandom_counter = Counter()
     ship_counter = Counter()
     books_counter = Counter()
@@ -15,25 +28,25 @@ def scrape_ao3_with_progress(username, password, progress_callback=None):
     total_words_counter = 0
     books_set = set()
 
-    # Use headless Chromium
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True, args=["--no-sandbox"])
-        page = browser.new_page()
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True, args=["--no-sandbox"])
+        page = await browser.new_page()
 
         # Login
-        page.goto("https://archiveofourown.org/users/login")
-        page.fill('form#new_user input[name="user[login]"]', username)
-        page.fill('form#new_user input[name="user[password]"]', password)
-        page.click('form#new_user input[type="submit"]')
-        time.sleep(3)
+        await page.goto("https://archiveofourown.org/users/login")
+        await page.fill('form#new_user input[name="user[login]"]', username)
+        await page.fill('form#new_user input[name="user[password]"]', password)
+        await page.click('form#new_user input[type="submit"]')
+        await page.wait_for_timeout(3000)  # Wait for login to complete
 
         page_number = 1
-        total_pages_estimate = 5  # approximate, can adjust
+        total_pages_estimate = 5  # Approximate, can adjust
 
         while True:
-            page.goto(f"https://archiveofourown.org/users/{username}/readings?page={page_number}")
-            time.sleep(1)
-            soup = BeautifulSoup(page.content(), "html.parser")
+            await page.goto(f"https://archiveofourown.org/users/{username}/readings?page={page_number}")
+            await page.wait_for_timeout(1000)
+            content = await page.content()
+            soup = BeautifulSoup(content, "html.parser")
             works = soup.select("li.reading.work.blurb.group")
             if not works:
                 break
@@ -76,11 +89,12 @@ def scrape_ao3_with_progress(username, password, progress_callback=None):
 
             # Update progress
             if progress_callback:
-                progress_callback(int((page_number / total_pages_estimate) * 100))
+                percentage = min(int((page_number / total_pages_estimate) * 100), 100)
+                progress_callback(percentage)
 
             page_number += 1
 
-        browser.close()
+        await browser.close()
 
     return {
         "total_books": len(books_set),

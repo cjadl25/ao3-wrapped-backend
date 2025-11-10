@@ -1,4 +1,4 @@
-# app_live.py
+# backend_live/app_live.py
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -9,10 +9,10 @@ import os
 
 app = FastAPI()
 
-# CORS so frontend (GitHub Pages) can call backend
+# CORS so frontend can call backend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Change to your frontend URL for security
+    allow_origins=["*"],  # replace "*" with your frontend URL for production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -67,4 +67,4 @@ async def get_progress():
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    uvicorn.run("backend_live.app_live:app", host="0.0.0.0", port=port, reload=True)
