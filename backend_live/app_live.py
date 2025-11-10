@@ -1,4 +1,4 @@
-# backend_live/app_live.py
+# app_live.py
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -12,7 +12,7 @@ app = FastAPI()
 # CORS so frontend can call backend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # replace "*" with your frontend URL for production
+    allow_origins=["*"],  # Replace with your frontend URL for production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -45,19 +45,23 @@ async def start_scrape(request: Request):
     # Reset progress
     scrape_progress.update({"progress": 0, "done": False, "results": None})
 
-    # Run scraper in the background
+    # Start scraper in background
     asyncio.create_task(run_scraper_background(username, password))
 
     return {"status": "scrape_started"}
 
 async def run_scraper_background(username, password):
+    # Callback to update progress
     def progress_callback(progress_percentage):
         scrape_progress["progress"] = progress_percentage
 
+    # Run the blocking scraper function in a separate thread
     loop = asyncio.get_event_loop()
     results = await loop.run_in_executor(
         None, scrape_ao3_with_progress, username, password, progress_callback
     )
+
+    # Update final results
     scrape_progress.update({"progress": 100, "done": True, "results": results})
 
 @app.get("/api/scrape-progress")
@@ -67,4 +71,4 @@ async def get_progress():
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
-    uvicorn.run("backend_live.app_live:app", host="0.0.0.0", port=port, reload=True)
+    uvicorn.run(app, host="0.0.0.0", port=port)
