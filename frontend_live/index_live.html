@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AO3 Wrapped</title>
+<style>
+body {
+    font-family: "Courier New", monospace;
+    background-color: #fff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+}
+
+.login-container {
+    width: 400px;
+    padding: 40px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    text-align: center;
+    background-color: #fff;
+}
+
+.login-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 30px;
+}
+
+.login-header img {
+    width: 50px;
+    margin-right: 10px;
+}
+
+.login-header h1 {
+    font-size: 24px;
+    color: #a10000;
+    margin: 0;
+    font-family: Georgia, serif;
+}
+
+.login-header h1 sup {
+    font-size: 12px;
+    vertical-align: super;
+}
+
+label {
+    display: block;
+    text-align: left;
+    font-weight: bold;
+    color: #a10000;
+    margin-bottom: 5px;
+    margin-top: 15px;
+    font-family: "Lucida Sans", sans-serif;
+}
+
+input[type="text"],
+input[type="password"] {
+    width: 100%;
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    background-color: #e8e8e8;
+    margin-bottom: 10px;
+    box-sizing: border-box;
+    font-family: "Lucida Sans", sans-serif;
+}
+
+.consent {
+    display: flex;
+    align-items: center;
+    font-size: 14px;
+    color: #a10000;
+    margin-top: 10px;
+    font-family: "Lucida Sans", sans-serif;
+}
+
+.consent input {
+    margin-right: 8px;
+    vertical-align: middle;
+}
+
+button {
+    margin-top: 20px;
+    padding: 12px 20px;
+    width: 100%;
+    background-color: #a10000;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    cursor: pointer;
+    font-family: Georgia, serif;
+}
+
+button:disabled {
+    background-color: #999;
+    cursor: not-allowed;
+}
+
+.progress-container {
+    width: 100%;
+    background-color: #e8e8e8;
+    border-radius: 10px;
+    overflow: hidden;
+    margin-top: 20px;
+    height: 20px;
+    display: none;
+}
+
+.progress-bar {
+    height: 100%;
+    width: 0%;
+    background-color: #a10000;
+    transition: width 0.3s ease;
+    text-align: center;
+    color: white;
+    font-size: 12px;
+    line-height: 20px;
+}
+
+#results {
+    text-align: left;
+    margin-top: 20px;
+    font-family: "Lucida Sans", sans-serif;
+}
+</style>
+</head>
+<body>
+
+<div class="login-container">
+    <div class="login-header">
+        <img src="https://i.postimg.cc/6QvLKKHD/ao3-logo.png" alt="AO3 Logo">
+        <h1>Archive of Our Own <sup>beta</sup> Wrapped</h1>
+    </div>
+
+    <label for="username">AO3 Username</label>
+    <input type="text" id="username" placeholder="Enter your AO3 username">
+
+    <label for="password">AO3 Password</label>
+    <input type="password" id="password" placeholder="Enter your AO3 password">
+
+    <div class="consent">
+        <input type="checkbox" id="consent">
+        <label for="consent">I consent to log in and get my AO3 Wrapped stats</label>
+    </div>
+
+    <button id="submitBtn" disabled>Get my AO3 Wrapped Stats!</button>
+
+    <div class="progress-container">
+        <div class="progress-bar" id="progressBar">0%</div>
+    </div>
+
+    <div id="results"></div>
+</div>
+
+<script>
+const BACKEND_URL = "https://ao3-wrapped-backend.onrender.com";  // your Render backend URL
+
+const submitBtn = document.getElementById("submitBtn");
+const consent = document.getElementById("consent");
+const progressBar = document.getElementById("progressBar");
+const progressContainer = document.querySelector(".progress-container");
+const resultsDiv = document.getElementById("results");
+
+consent.addEventListener("change", () => {
+    submitBtn.disabled = !consent.checked;
+});
+
+submitBtn.addEventListener("click", () => {
+    const username = document.getElementById("username").value;
+    const password = document.getElementById("password").value;
+
+    resultsDiv.innerHTML = "";
+    progressBar.style.width = "0%";
+    progressBar.textContent = "0%";
+    progressContainer.style.display = "block";
+    submitBtn.disabled = true;
+
+    fetch(`${BACKEND_URL}/api/start-scrape`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password, consent: true })
+    }).then(() => pollProgress());
+
+    function pollProgress() {
+        const interval = setInterval(() => {
+            fetch(`${BACKEND_URL}/api/scrape-progress`)
+                .then(res => res.json())
+                .then(data => {
+                    progressBar.style.width = `${data.progress}%`;
+                    progressBar.textContent = `${data.progress}%`;
+                    if (data.done) {
+                        clearInterval(interval);
+                        progressBar.style.width = "100%";
+                        progressBar.textContent = "100%";
+                        setTimeout(() => {
+                            progressContainer.style.display = "none";
+                            const r = data.results;
+                            resultsDiv.innerHTML = `
+                                <h3>✅ Your AO3 Wrapped Stats</h3>
+                                <p><strong>Total Books Read:</strong> ${r.total_books}</p>
+                                <p><strong>Total Words Read:</strong> ${r.total_words.toLocaleString()}</p>
+
+                                <strong>📚 Top Books</strong>
+                                <ol>${r.top_books.map(b => `<li>${b[0]} — ${b[1]} reads</li>`).join('')}</ol>
+
+                                <strong>💘 Top Ships</strong>
+                                <ol>${r.top_ships.map(s => `<li>${s[0]} — ${s[1]} visits</li>`).join('')}</ol>
+
+                                <strong>🌍 Top Fandoms</strong>
+                                <ol>${r.top_fandoms.map(f => `<li>${f[0]} — ${f[1]} works</li>`).join('')}</ol>
+
+                                <strong>🚫 Top Ratings</strong>
+                                <ol>${r.top_ratings.map(rt => `<li>${rt[0]} — ${rt[1]} works</li>`).join('')}</ol>
+                            `;
+                            submitBtn.disabled = false;
+                        }, 300);
+                    }
+                });
+        }, 500);
+    }
+});
+</script>
+
+</body>
+</html>
