@@ -3,7 +3,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from scraper_live import scrape_ao3_with_progress
+from .scraper_live import scrape_ao3_with_progress
 import asyncio
 import os
 
