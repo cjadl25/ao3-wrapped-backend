@@ -5,7 +5,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 import asyncio
 import os
-from scraper_live import scrape_ao3_with_progress
+from .scraper_live import scrape_ao3_with_progress
 
 app = FastAPI(title="AO3 Wrapped Backend")
 
