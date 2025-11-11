@@ -7,6 +7,28 @@ import time, re, os
 def extract_number(text):
     return int(re.sub(r"[^\d]", "", text)) if text else 0
 
+def get_chromium_executable():
+    """
+    Try to locate Chromium executable for Playwright.
+    """
+    base_path = os.environ.get("PLAYWRIGHT_BROWSERS_PATH")
+    paths_to_try = []
+
+    if base_path:
+        paths_to_try.append(os.path.join(base_path, "chromium", "chrome-linux", "chrome"))
+
+    home_playwright = os.path.expanduser("~/.playwright")
+    paths_to_try.append(os.path.join(home_playwright, "chromium", "chrome-linux", "chrome"))
+
+    for path in paths_to_try:
+        if os.path.exists(path):
+            return path
+
+    raise Exception(
+        "Chromium executable not found! "
+        "Make sure 'python -m playwright install chromium' was run."
+    )
+
 def scrape_ao3_with_progress(username, password, progress_callback=None):
     fandom_counter = Counter()
     ship_counter = Counter()
@@ -15,8 +37,7 @@ def scrape_ao3_with_progress(username, password, progress_callback=None):
     total_words_counter = 0
     books_set = set()
 
-    chromium_base = os.environ.get("PLAYWRIGHT_BROWSERS_PATH", ".playwright")
-    chrome_path = os.path.join(chromium_base, "chromium", "chrome-linux", "chrome")
+    chrome_path = get_chromium_executable()
 
     with sync_playwright() as p:
         browser = p.chromium.launch(
@@ -33,22 +54,13 @@ def scrape_ao3_with_progress(username, password, progress_callback=None):
         page.click('form#new_user input[type="submit"]')
         time.sleep(3)
 
+        # Check for login failure
         if "Incorrect username or password" in page.content() or "login" in page.url.lower():
             browser.close()
             raise Exception("Login failed: incorrect username or password")
 
-        # Determine total pages dynamically
-        page.goto(f"https://archiveofourown.org/users/{username}/readings")
-        soup = BeautifulSoup(page.content(), "html.parser")
-        pagination_links = soup.select("ol.pagination li a")
-        total_pages = 1
-        if pagination_links:
-            try:
-                total_pages = max(int(a.get_text()) for a in pagination_links if a.get_text().isdigit())
-            except:
-                total_pages = 1
-
         page_number = 1
+        total_pages_estimate = 5  # approximate, adjust if needed
 
         while True:
             page.goto(f"https://archiveofourown.org/users/{username}/readings?page={page_number}")
@@ -86,6 +98,7 @@ def scrape_ao3_with_progress(username, password, progress_callback=None):
                         if lis:
                             rating_counter[lis[0]] += 1
 
+                # Ships / pairings
                 pairings = []
                 for li in work.select("ul.tags.commas li.relationships"):
                     pairings.extend([p.strip() for p in li.get_text(strip=True).split(",")])
@@ -93,11 +106,9 @@ def scrape_ao3_with_progress(username, password, progress_callback=None):
                     ship_counter[pairing] += visits
 
             if progress_callback:
-                progress_callback(int((page_number / total_pages) * 100))
+                progress_callback(int((page_number / total_pages_estimate) * 100))
 
             page_number += 1
-            if page_number > total_pages:
-                break
 
         browser.close()
 

@@ -5,25 +5,19 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 import asyncio
 import os
-from .scraper_live import scrape_ao3_with_progress  # make sure it's in the same folder
+from scraper_live import scrape_ao3_with_progress
 
 app = FastAPI(title="AO3 Wrapped Backend")
 
-# Allow frontend requests
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # replace with your frontend URL if you want
+    allow_origins=["*"],  # Change to frontend URL for production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Serve frontend
 app.mount("/static", StaticFiles(directory="frontend_live"), name="static")
-
-@app.get("/")
-async def serve_frontend():
-    return FileResponse(os.path.join("frontend_live", "index_live.html"))
 
 scrape_progress = {
     "progress": 0,
@@ -31,6 +25,10 @@ scrape_progress = {
     "results": None,
     "error": None
 }
+
+@app.get("/")
+async def serve_frontend():
+    return FileResponse(os.path.join("frontend_live", "index_live.html"))
 
 @app.post("/api/start-scrape")
 async def start_scrape(request: Request):
@@ -43,19 +41,16 @@ async def start_scrape(request: Request):
         raise HTTPException(status_code=400, detail="Username, password, and consent required")
 
     scrape_progress.update({"progress": 0, "done": False, "results": None, "error": None})
-
     asyncio.create_task(run_scraper_background(username, password))
     return {"status": "scrape_started"}
 
 async def run_scraper_background(username, password):
-    def progress_callback(progress_percentage):
-        scrape_progress["progress"] = progress_percentage
+    def progress_callback(progress):
+        scrape_progress["progress"] = progress
 
     loop = asyncio.get_event_loop()
     try:
-        results = await loop.run_in_executor(
-            None, scrape_ao3_with_progress, username, password, progress_callback
-        )
+        results = await loop.run_in_executor(None, scrape_ao3_with_progress, username, password, progress_callback)
         scrape_progress.update({"progress": 100, "done": True, "results": results})
     except Exception as e:
         scrape_progress.update({"progress": 100, "done": True, "results": None, "error": str(e)})
