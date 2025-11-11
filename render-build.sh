@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-set -e  # Exit immediately if a command exits with a non-zero status
+set -e  # Exit on error
 
 echo "Installing Python dependencies..."
-pip install -r requirements.txt
+pip install --user -r requirements.txt
 
 echo "Setting Playwright browsers path..."
-export PLAYWRIGHT_BROWSERS_PATH=/opt/render/project/src/.playwright
+export PLAYWRIGHT_BROWSERS_PATH=$HOME/.playwright
 
-echo "Installing Chromium for Playwright..."
-playwright install --with-deps chromium
+echo "Installing Chromium for Playwright locally..."
+~/.local/bin/playwright install --with-deps chromium
 
 echo "Build completed successfully!"
