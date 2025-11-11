@@ -4,7 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AO3 Wrapped</title>
+
 <style>
+/* ——— GENERAL ——— */
 body {
     font-family: "Courier New", monospace;
     background-color: #fff;
@@ -15,6 +17,7 @@ body {
     margin: 0;
 }
 
+/* ——— CARD ——— */
 .login-container {
     width: 400px;
     padding: 40px;
@@ -24,6 +27,7 @@ body {
     background-color: #fff;
 }
 
+/* ——— HEADER ——— */
 .login-header {
     display: flex;
     align-items: center;
@@ -48,6 +52,7 @@ body {
     vertical-align: super;
 }
 
+/* ——— FORM ——— */
 label {
     display: block;
     text-align: left;
@@ -70,6 +75,7 @@ input[type="password"] {
     font-family: "Lucida Sans", sans-serif;
 }
 
+/* ——— CONSENT ——— */
 .consent {
     display: flex;
     align-items: center;
@@ -84,6 +90,7 @@ input[type="password"] {
     vertical-align: middle;
 }
 
+/* ——— BUTTON ——— */
 button {
     margin-top: 20px;
     padding: 12px 20px;
@@ -102,13 +109,14 @@ button:disabled {
     cursor: not-allowed;
 }
 
+/* ——— PROGRESS BAR ——— */
 .progress-container {
     width: 100%;
     background-color: #e8e8e8;
     border-radius: 10px;
     overflow: hidden;
     margin-top: 20px;
-    height: 20px;
+    height: 22px;
     display: none;
 }
 
@@ -120,28 +128,46 @@ button:disabled {
     text-align: center;
     color: white;
     font-size: 12px;
-    line-height: 20px;
+    line-height: 22px;
 }
 
-#results {
-    text-align: left;
-    margin-top: 20px;
+/* ——— ERROR SHAKE + RED GLOW ——— */
+@keyframes shake {
+    0%,100% { transform: translateX(0); }
+    20% { transform: translateX(-6px); }
+    40% { transform: translateX(6px); }
+    60% { transform: translateX(-4px); }
+    80% { transform: translateX(4px); }
+}
+
+.error-animate {
+    animation: shake 0.4s ease-in-out;
+    box-shadow: 0 0 15px rgba(255, 0, 0, 0.9);
+    border-radius: 6px;
+    transition: box-shadow 1.2s ease-out;
+}
+
+#errorMessage {
+    margin-top: 10px;
+    font-size: 14px;
     font-family: "Lucida Sans", sans-serif;
 }
 </style>
 </head>
+
 <body>
 
 <div class="login-container">
+
     <div class="login-header">
         <img src="https://i.postimg.cc/6QvLKKHD/ao3-logo.png" alt="AO3 Logo">
         <h1>Archive of Our Own <sup>beta</sup> Wrapped</h1>
     </div>
 
-    <label for="username">AO3 Username</label>
+    <label>AO3 Username</label>
     <input type="text" id="username" placeholder="Enter your AO3 username">
 
-    <label for="password">AO3 Password</label>
+    <label>AO3 Password</label>
     <input type="password" id="password" placeholder="Enter your AO3 password">
 
     <div class="consent">
@@ -151,6 +177,8 @@ button:disabled {
 
     <button id="submitBtn" disabled>Get my AO3 Wrapped Stats!</button>
 
+    <div id="errorMessage"></div>
+
     <div class="progress-container">
         <div class="progress-bar" id="progressBar">0%</div>
     </div>
@@ -158,8 +186,8 @@ button:disabled {
     <div id="results"></div>
 </div>
 
+
 <script>
-// ✅ YOUR BACKEND URL HERE
 const BACKEND_URL = "https://ao3-wrapped-backend.onrender.com";
 
 const submitBtn = document.getElementById("submitBtn");
@@ -167,68 +195,90 @@ const consent = document.getElementById("consent");
 const progressBar = document.getElementById("progressBar");
 const progressContainer = document.querySelector(".progress-container");
 const resultsDiv = document.getElementById("results");
+const errorMessage = document.getElementById("errorMessage");
 
 consent.addEventListener("change", () => {
     submitBtn.disabled = !consent.checked;
 });
 
-// ✅ global function so frontend can poll scraping progress
-function pollProgress() {
-    const interval = setInterval(async () => {
-        const res = await fetch(`${BACKEND_URL}/api/scrape-progress`);
-        const data = await res.json();
+function showError(msg) {
+    errorMessage.innerText = msg;
+    errorMessage.style.color = "red";
+    errorMessage.classList.add("error-animate");
 
-        progressBar.style.width = `${data.progress}%`;
-        progressBar.textContent = `${data.progress}%`;
-
-        if (data.done) {
-            clearInterval(interval);
-            progressBar.style.width = "100%";
-            progressBar.textContent = "100%";
-
-            const r = data.results;
-
-            resultsDiv.innerHTML = `
-                <h3>✅ Your AO3 Wrapped Stats</h3>
-                <p><strong>Total Books Read:</strong> ${r.total_books}</p>
-                <p><strong>Total Words Read:</strong> ${Number(r.total_words).toLocaleString()}</p>
-
-                <strong>📚 Top Books</strong>
-                <ol>${r.top_books.map(b => `<li>${b[0]} — ${b[1]} reads</li>`).join("")}</ol>
-
-                <strong>💘 Top Ships</strong>
-                <ol>${r.top_ships.map(s => `<li>${s[0]} — ${s[1]} visits</li>`).join("")}</ol>
-
-                <strong>🌍 Top Fandoms</strong>
-                <ol>${r.top_fandoms.map(f => `<li>${f[0]} — ${f[1]} works</li>`).join("")}</ol>
-
-                <strong>🚫 Top Ratings</strong>
-                <ol>${r.top_ratings.map(rt => `<li>${rt[0]} — ${rt[1]} works</li>`).join("")}</ol>
-            `;
-
-            submitBtn.disabled = false;
-        }
-    }, 800);
+    setTimeout(() => {
+        errorMessage.classList.remove("error-animate");
+    }, 1500);
 }
 
-submitBtn.addEventListener("click", async () => {
-    const username = document.getElementById("username").value;
-    const password = document.getElementById("password").value;
+submitBtn.addEventListener("click", () => {
 
+    const username = document.getElementById("username").value.trim();
+    const password = document.getElementById("password").value.trim();
+
+    if (!username || !password) {
+        showError("⚠️ Username and password required.");
+        return;
+    }
+
+    errorMessage.innerText = "";
     resultsDiv.innerHTML = "";
+
     progressBar.style.width = "0%";
     progressBar.textContent = "0%";
     progressContainer.style.display = "block";
     submitBtn.disabled = true;
 
-    await fetch(`${BACKEND_URL}/api/start-scrape`, {
+    fetch(`${BACKEND_URL}/api/start-scrape`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password, consent: true })
-    });
-
-    pollProgress();
+    })
+    .then(res => res.json())
+    .catch(() => showError("❌ Server unreachable."))
+    .then(() => pollProgress());
 });
+
+function pollProgress() {
+    const interval = setInterval(() => {
+        fetch(`${BACKEND_URL}/api/scrape-progress`)
+            .then(res => res.json())
+            .then(data => {
+                progressBar.style.width = `${data.progress}%`;
+                progressBar.textContent = `${data.progress}%`;
+
+                if (data.error) {
+                    clearInterval(interval);
+                    showError(data.error);
+                    submitBtn.disabled = false;
+                }
+
+                if (data.done) {
+                    clearInterval(interval);
+                    resultsDiv.innerHTML = `
+                        <h3>✅ Your AO3 Wrapped Stats</h3>
+                        <p><strong>Total Books Read:</strong> ${data.results.total_books}</p>
+                        <p><strong>Total Words Read:</strong> ${data.results.total_words.toLocaleString()}</p>
+
+                        <strong>📚 Top Books</strong>
+                        <ol>${data.results.top_books.map(b => `<li>${b[0]} — ${b[1]} reads</li>`).join('')}</ol>
+
+                        <strong>💘 Top Ships</strong>
+                        <ol>${data.results.top_ships.map(s => `<li>${s[0]} — ${s[1]} visits</li>`).join('')}</ol>
+
+                        <strong>🌍 Top Fandoms</strong>
+                        <ol>${data.results.top_fandoms.map(f => `<li>${f[0]} — ${f[1]} works</li>`).join('')}</ol>
+
+                        <strong>🚫 Top Ratings</strong>
+                        <ol>${data.results.top_ratings.map(rt => `<li>${rt[0]} — ${rt[1]} works</li>`).join('')}</ol>
+                    `;
+
+                    submitBtn.disabled = false;
+                    progressContainer.style.display = "none";
+                }
+            });
+    }, 500);
+}
 </script>
 
 </body>
