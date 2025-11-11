@@ -3,16 +3,16 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from .scraper_live import scrape_ao3_with_progress
 import asyncio
 import os
+from scraper_live import scrape_ao3_with_progress
 
-app = FastAPI()
+app = FastAPI(title="AO3 Wrapped Backend")
 
-# CORS so frontend can call backend
+# Allow frontend requests
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Replace with your frontend URL for production
+    allow_origins=["*"],  # Replace "*" with your frontend URL for security
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -25,11 +25,12 @@ app.mount("/static", StaticFiles(directory="frontend_live"), name="static")
 async def serve_frontend():
     return FileResponse(os.path.join("frontend_live", "index_live.html"))
 
-# In-memory progress tracking
+# In-memory store for scraping progress/results
 scrape_progress = {
     "progress": 0,
     "done": False,
-    "results": None
+    "results": None,
+    "error": None
 }
 
 @app.post("/api/start-scrape")
@@ -43,7 +44,7 @@ async def start_scrape(request: Request):
         raise HTTPException(status_code=400, detail="Username, password, and consent required")
 
     # Reset progress
-    scrape_progress.update({"progress": 0, "done": False, "results": None})
+    scrape_progress.update({"progress": 0, "done": False, "results": None, "error": None})
 
     # Start scraper in background
     asyncio.create_task(run_scraper_background(username, password))
@@ -51,18 +52,17 @@ async def start_scrape(request: Request):
     return {"status": "scrape_started"}
 
 async def run_scraper_background(username, password):
-    # Callback to update progress
     def progress_callback(progress_percentage):
         scrape_progress["progress"] = progress_percentage
 
-    # Run the blocking scraper function in a separate thread
     loop = asyncio.get_event_loop()
-    results = await loop.run_in_executor(
-        None, scrape_ao3_with_progress, username, password, progress_callback
-    )
-
-    # Update final results
-    scrape_progress.update({"progress": 100, "done": True, "results": results})
+    try:
+        results = await loop.run_in_executor(
+            None, scrape_ao3_with_progress, username, password, progress_callback
+        )
+        scrape_progress.update({"progress": 100, "done": True, "results": results})
+    except Exception as e:
+        scrape_progress.update({"progress": 100, "done": True, "results": None, "error": str(e)})
 
 @app.get("/api/scrape-progress")
 async def get_progress():
