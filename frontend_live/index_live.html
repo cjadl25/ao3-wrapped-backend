@@ -159,7 +159,8 @@ button:disabled {
 </div>
 
 <script>
-const BACKEND_URL = "https://ao3-wrapped-backend.onrender.com";  // your Render backend URL
+// ✅ YOUR BACKEND URL HERE
+const BACKEND_URL = "https://ao3-wrapped-backend.onrender.com";
 
 const submitBtn = document.getElementById("submitBtn");
 const consent = document.getElementById("consent");
@@ -171,7 +172,46 @@ consent.addEventListener("change", () => {
     submitBtn.disabled = !consent.checked;
 });
 
-submitBtn.addEventListener("click", () => {
+// ✅ global function so frontend can poll scraping progress
+function pollProgress() {
+    const interval = setInterval(async () => {
+        const res = await fetch(`${BACKEND_URL}/api/scrape-progress`);
+        const data = await res.json();
+
+        progressBar.style.width = `${data.progress}%`;
+        progressBar.textContent = `${data.progress}%`;
+
+        if (data.done) {
+            clearInterval(interval);
+            progressBar.style.width = "100%";
+            progressBar.textContent = "100%";
+
+            const r = data.results;
+
+            resultsDiv.innerHTML = `
+                <h3>✅ Your AO3 Wrapped Stats</h3>
+                <p><strong>Total Books Read:</strong> ${r.total_books}</p>
+                <p><strong>Total Words Read:</strong> ${Number(r.total_words).toLocaleString()}</p>
+
+                <strong>📚 Top Books</strong>
+                <ol>${r.top_books.map(b => `<li>${b[0]} — ${b[1]} reads</li>`).join("")}</ol>
+
+                <strong>💘 Top Ships</strong>
+                <ol>${r.top_ships.map(s => `<li>${s[0]} — ${s[1]} visits</li>`).join("")}</ol>
+
+                <strong>🌍 Top Fandoms</strong>
+                <ol>${r.top_fandoms.map(f => `<li>${f[0]} — ${f[1]} works</li>`).join("")}</ol>
+
+                <strong>🚫 Top Ratings</strong>
+                <ol>${r.top_ratings.map(rt => `<li>${rt[0]} — ${rt[1]} works</li>`).join("")}</ol>
+            `;
+
+            submitBtn.disabled = false;
+        }
+    }, 800);
+}
+
+submitBtn.addEventListener("click", async () => {
     const username = document.getElementById("username").value;
     const password = document.getElementById("password").value;
 
@@ -181,49 +221,13 @@ submitBtn.addEventListener("click", () => {
     progressContainer.style.display = "block";
     submitBtn.disabled = true;
 
-    fetch(`${BACKEND_URL}/api/start-scrape`, {
+    await fetch(`${BACKEND_URL}/api/start-scrape`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password, consent: true })
-    }).then(() => pollProgress());
+    });
 
-    function pollProgress() {
-        const interval = setInterval(() => {
-            fetch(`${BACKEND_URL}/api/scrape-progress`)
-                .then(res => res.json())
-                .then(data => {
-                    progressBar.style.width = `${data.progress}%`;
-                    progressBar.textContent = `${data.progress}%`;
-                    if (data.done) {
-                        clearInterval(interval);
-                        progressBar.style.width = "100%";
-                        progressBar.textContent = "100%";
-                        setTimeout(() => {
-                            progressContainer.style.display = "none";
-                            const r = data.results;
-                            resultsDiv.innerHTML = `
-                                <h3>✅ Your AO3 Wrapped Stats</h3>
-                                <p><strong>Total Books Read:</strong> ${r.total_books}</p>
-                                <p><strong>Total Words Read:</strong> ${r.total_words.toLocaleString()}</p>
-
-                                <strong>📚 Top Books</strong>
-                                <ol>${r.top_books.map(b => `<li>${b[0]} — ${b[1]} reads</li>`).join('')}</ol>
-
-                                <strong>💘 Top Ships</strong>
-                                <ol>${r.top_ships.map(s => `<li>${s[0]} — ${s[1]} visits</li>`).join('')}</ol>
-
-                                <strong>🌍 Top Fandoms</strong>
-                                <ol>${r.top_fandoms.map(f => `<li>${f[0]} — ${f[1]} works</li>`).join('')}</ol>
-
-                                <strong>🚫 Top Ratings</strong>
-                                <ol>${r.top_ratings.map(rt => `<li>${rt[0]} — ${rt[1]} works</li>`).join('')}</ol>
-                            `;
-                            submitBtn.disabled = false;
-                        }, 300);
-                    }
-                });
-        }, 500);
-    }
+    pollProgress();
 });
 </script>
 
