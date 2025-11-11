@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-set -e  # stop on first error
+set -e
 
-echo "Installing Python dependencies..."
+echo "=== Installing Python dependencies ==="
+pip install --upgrade pip
 pip install -r requirements.txt
 
-# Set Playwright path inside project (avoids root permission issues)
-export PLAYWRIGHT_BROWSERS_PATH=.playwright
+echo "=== Installing Playwright Browsers Locally (NO ROOT) ==="
+export PLAYWRIGHT_BROWSERS_PATH=/opt/render/project/src/.playwright
 
-echo "Installing Playwright Chromium with all dependencies..."
-playwright install --with-deps chromium
+# Install chromium only, without root
+npx playwright install chromium --with-deps
 
-echo "Build completed successfully!"
+echo "=== Build Complete ✅ ==="
