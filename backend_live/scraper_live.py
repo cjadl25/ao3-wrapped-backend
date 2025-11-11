@@ -5,7 +5,6 @@ from collections import Counter
 import time, re, os
 
 def extract_number(text):
-    """Extract integer from string, e.g. '1,234 words' -> 1234"""
     return int(re.sub(r"[^\d]", "", text)) if text else 0
 
 def scrape_ao3_with_progress(username, password, progress_callback=None):
@@ -16,13 +15,16 @@ def scrape_ao3_with_progress(username, password, progress_callback=None):
     total_words_counter = 0
     books_set = set()
 
-    # Determine Chromium executable from environment variable
-    chromium_base = os.environ.get("PLAYWRIGHT_BROWSERS_PATH", "")
+    # Get Playwright Chromium path from environment variable
+    chromium_base = os.environ.get("PLAYWRIGHT_BROWSERS_PATH", ".playwright")
     chrome_path = os.path.join(chromium_base, "chromium", "chrome-linux", "chrome")
 
-    # Use headless Chromium
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True, executable_path=chrome_path)
+        browser = p.chromium.launch(
+            headless=True,
+            executable_path=chrome_path,
+            args=["--no-sandbox"]
+        )
         page = browser.new_page()
 
         # Login
@@ -32,13 +34,13 @@ def scrape_ao3_with_progress(username, password, progress_callback=None):
         page.click('form#new_user input[type="submit"]')
         time.sleep(3)
 
-        # Check for failed login
-        if "Invalid username or password" in page.content():
+        # Check for login failure
+        if "Incorrect username or password" in page.content() or "login" in page.url.lower():
             browser.close()
-            raise ValueError("Incorrect username or password")
+            raise Exception("Login failed: incorrect username or password")
 
         page_number = 1
-        total_pages_estimate = 5  # approximate, can adjust
+        total_pages_estimate = 5  # approximate
 
         while True:
             page.goto(f"https://archiveofourown.org/users/{username}/readings?page={page_number}")
@@ -54,7 +56,6 @@ def scrape_ao3_with_progress(username, password, progress_callback=None):
                     continue
                 title = title_tag.get_text(strip=True)
 
-                # Visits / rereads
                 visit_tag = work.select_one("h4.viewed.heading")
                 visits = 1
                 if visit_tag:
