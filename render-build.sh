@@ -7,8 +7,7 @@ pip install -r requirements.txt
 
 echo "=== Installing Playwright Browsers Locally (NO ROOT) ==="
 export PLAYWRIGHT_BROWSERS_PATH=/opt/render/project/src/.playwright
-
-# Install chromium only, without root
+# Chromium only, no root needed
 npx playwright install chromium --with-deps
 
 echo "=== Build Complete ✅ ==="

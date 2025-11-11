@@ -5,14 +5,14 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 import asyncio
 import os
-from .scraper_live import scrape_ao3_with_progress
+from .scraper_live import scrape_ao3_with_progress  # make sure it's in the same folder
 
 app = FastAPI(title="AO3 Wrapped Backend")
 
 # Allow frontend requests
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Replace "*" with your frontend URL for security
+    allow_origins=["*"],  # replace with your frontend URL if you want
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -25,7 +25,6 @@ app.mount("/static", StaticFiles(directory="frontend_live"), name="static")
 async def serve_frontend():
     return FileResponse(os.path.join("frontend_live", "index_live.html"))
 
-# In-memory store for scraping progress/results
 scrape_progress = {
     "progress": 0,
     "done": False,
@@ -43,12 +42,9 @@ async def start_scrape(request: Request):
     if not username or not password or not consent:
         raise HTTPException(status_code=400, detail="Username, password, and consent required")
 
-    # Reset progress
     scrape_progress.update({"progress": 0, "done": False, "results": None, "error": None})
 
-    # Start scraper in background
     asyncio.create_task(run_scraper_background(username, password))
-
     return {"status": "scrape_started"}
 
 async def run_scraper_background(username, password):
